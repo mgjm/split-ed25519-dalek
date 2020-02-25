@@ -22,12 +22,7 @@ travis-ci = { repository = "dalek-cryptography/ed25519-dalek", branch = "master"
 features = ["nightly", "batch"]
 
 [dependencies]
-clear_on_drop = { version = "0.2" }
-curve25519-dalek = { version = "2", default-features = false }
-merlin = { version = "1", default-features = false, optional = true, git = "https://github.com/isislovecruft/merlin", branch = "develop" }
-rand = { version = "0.7", default-features = false, optional = true }
-rand_core = { version = "0.5", default-features = false, optional = true }
-serde = { version = "1.0", optional = true }
+eddsa-dalek = { path = "../eddsa-dalek", default-features = false }
 sha2 = { version = "0.8", default-features = false }
 
 [dev-dependencies]
@@ -35,6 +30,7 @@ hex = "^0.4"
 bincode = "^0.9"
 criterion = "0.3"
 rand = "0.7"
+dev-serde = { version = "1.0", package = "serde" }
 
 [[bench]]
 name = "ed25519_benchmarks"
@@ -45,15 +41,14 @@ harness = false
 
 [features]
 default = ["std", "u64_backend"]
-std = ["curve25519-dalek/std", "sha2/std", "rand/std"]
-alloc = ["curve25519-dalek/alloc", "rand/alloc"]
-nightly = ["curve25519-dalek/nightly", "clear_on_drop/nightly", "rand/nightly"]
-batch = ["merlin", "rand"]
-# This feature enables deterministic batch verification.
-batch_deterministic = ["merlin", "rand", "rand_core"]
+std = ["eddsa-dalek/std", "sha2/std"]
+alloc = ["eddsa-dalek/alloc"]
+nightly = ["eddsa-dalek/nightly"]
+serde = ["eddsa-dalek/serde"]
+batch = ["eddsa-dalek/batch"]
+batch_deterministic = ["eddsa-dalek/batch_deterministic"]
 asm = ["sha2/asm"]
-# This features turns off stricter checking for scalar malleability in signatures
-legacy_compatibility = []
-u64_backend = ["curve25519-dalek/u64_backend"]
-u32_backend = ["curve25519-dalek/u32_backend"]
-simd_backend = ["curve25519-dalek/simd_backend"]
+legacy_compatibility = ["eddsa-dalek/legacy_compatibility"]
+u64_backend = ["eddsa-dalek/u64_backend"]
+u32_backend = ["eddsa-dalek/u32_backend"]
+simd_backend = ["eddsa-dalek/simd_backend"]

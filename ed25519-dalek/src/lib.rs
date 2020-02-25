@@ -166,7 +166,7 @@
 //! # extern crate rand;
 //! # extern crate ed25519_dalek;
 //! # #[cfg(feature = "serde")]
-//! extern crate serde;
+//! extern crate dev_serde;
 //! # #[cfg(feature = "serde")]
 //! extern crate bincode;
 //!
@@ -196,7 +196,7 @@
 //! # extern crate rand;
 //! # extern crate ed25519_dalek;
 //! # #[cfg(feature = "serde")]
-//! # extern crate serde;
+//! # extern crate dev_serde;
 //! # #[cfg(feature = "serde")]
 //! # extern crate bincode;
 //! #
@@ -233,32 +233,32 @@
 #![warn(future_incompatible)]
 #![deny(missing_docs)] // refuse to compile if documentation is missing
 
-#[cfg(any(feature = "std", test))]
-#[macro_use]
-extern crate std;
-
-#[cfg(all(feature = "alloc", not(feature = "std")))]
-extern crate alloc;
-extern crate clear_on_drop;
-extern crate curve25519_dalek;
-#[cfg(all(any(feature = "batch", feature = "batch_deterministic"), any(feature = "std", feature = "alloc")))]
-extern crate merlin;
-#[cfg(any(feature = "batch", feature = "std", feature = "alloc", test))]
-extern crate rand;
-#[cfg(feature = "serde")]
-extern crate serde;
+extern crate eddsa_dalek;
 extern crate sha2;
 
-#[cfg(all(any(feature = "batch", feature = "batch_deterministic"), any(feature = "std", feature = "alloc")))]
-mod batch;
-mod constants;
-mod ed25519;
-mod errors;
-mod public;
-mod secret;
-mod signature;
+pub use eddsa_dalek::non_generic::*;
+pub use sha2::Sha512;
 
-// Export everything public in ed25519.
-pub use crate::ed25519::*;
-#[cfg(all(any(feature = "batch", feature = "batch_deterministic"), any(feature = "std", feature = "alloc")))]
-pub use crate::batch::*;
+#[cfg(all(
+	any(feature = "batch", feature = "batch_deterministic"),
+	any(feature = "std", feature = "alloc")
+))]
+mod batch;
+
+#[cfg(all(
+	any(feature = "batch", feature = "batch_deterministic"),
+	any(feature = "std", feature = "alloc")
+))]
+pub use batch::*;
+
+/// ExpandedSecretKey with Sha512 digest.
+pub type ExpandedSecretKey = eddsa_dalek::ExpandedSecretKey<Sha512>;
+
+/// Keypair with Sha512 digest.
+pub type Keypair = eddsa_dalek::Keypair<Sha512>;
+
+/// PublicKey with Sha512 digest.
+pub type PublicKey = eddsa_dalek::PublicKey<Sha512>;
+
+/// SecretKey with Sha512 digest.
+pub type SecretKey = eddsa_dalek::SecretKey<Sha512>;
