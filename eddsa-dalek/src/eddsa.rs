@@ -20,29 +20,27 @@ use serde::de::Visitor;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-pub use sha2::Sha512;
-
 use curve25519_dalek::digest::generic_array::typenum::U64;
-pub use curve25519_dalek::digest::Digest;
+use curve25519_dalek::digest::Digest;
 
 #[cfg(all(feature = "batch", any(feature = "std", feature = "alloc")))]
-pub use crate::batch::*;
-pub use crate::constants::*;
-pub use crate::errors::*;
-pub use crate::public::*;
-pub use crate::secret::*;
-pub use crate::signature::*;
+use crate::batch::*;
+use crate::constants::*;
+use crate::errors::*;
+use crate::public::*;
+use crate::secret::*;
+use crate::signature::*;
 
 /// An ed25519 keypair.
 #[derive(Debug, Default)] // we derive Default in order to use the clear() method in Drop
-pub struct Keypair {
+pub struct Keypair<D> {
     /// The secret half of this keypair.
-    pub secret: SecretKey,
+    pub secret: SecretKey<D>,
     /// The public half of this keypair.
-    pub public: PublicKey,
+    pub public: PublicKey<D>,
 }
 
-impl Keypair {
+impl<D> Keypair<D> {
     /// Convert this keypair to bytes.
     ///
     /// # Returns
@@ -79,7 +77,7 @@ impl Keypair {
     ///
     /// A `Result` whose okay value is an EdDSA `Keypair` or whose error value
     /// is an `SignatureError` describing the error that occurred.
-    pub fn from_bytes<'a>(bytes: &'a [u8]) -> Result<Keypair, SignatureError> {
+    pub fn from_bytes<'a>(bytes: &'a [u8]) -> Result<Keypair<D>, SignatureError> {
         if bytes.len() != KEYPAIR_LENGTH {
             return Err(SignatureError(InternalError::BytesLengthError {
                 name: "Keypair",
@@ -107,11 +105,12 @@ impl Keypair {
     /// # fn main() {
     ///
     /// use rand::rngs::OsRng;
+    /// use sha2::Sha512;
     /// use eddsa_dalek::Keypair;
     /// use eddsa_dalek::Signature;
     ///
     /// let mut csprng = OsRng{};
-    /// let keypair: Keypair = Keypair::generate(&mut csprng);
+    /// let keypair: Keypair<Sha512> = Keypair::generate(&mut csprng);
     ///
     /// # }
     /// #
@@ -128,12 +127,13 @@ impl Keypair {
     /// The standard hash function used for most ed25519 libraries is SHA-512,
     /// which is available with `use sha2::Sha512` as in the example above.
     /// Other suitable hash functions include Keccak-512 and Blake2b-512.
-    pub fn generate<R>(csprng: &mut R) -> Keypair
+    pub fn generate<R>(csprng: &mut R) -> Keypair<D>
     where
+        D: Digest<OutputSize = U64>,
         R: CryptoRng + RngCore,
     {
-        let sk: SecretKey = SecretKey::generate(csprng);
-        let pk: PublicKey = (&sk).into();
+        let sk: SecretKey<D> = SecretKey::generate(csprng);
+        let pk: PublicKey<D> = (&sk).into();
 
         Keypair {
             public: pk,
@@ -142,8 +142,11 @@ impl Keypair {
     }
 
     /// Sign a message with this keypair's secret key.
-    pub fn sign(&self, message: &[u8]) -> Signature {
-        let expanded: ExpandedSecretKey = (&self.secret).into();
+    pub fn sign(&self, message: &[u8]) -> Signature
+    where
+        D: Digest<OutputSize = U64>,
+    {
+        let expanded: ExpandedSecretKey<D> = (&self.secret).into();
 
         expanded.sign(&message, &self.public)
     }
@@ -172,14 +175,14 @@ impl Keypair {
     ///
     /// use eddsa_dalek::Digest;
     /// use eddsa_dalek::Keypair;
-    /// use eddsa_dalek::Sha512;
     /// use eddsa_dalek::Signature;
     /// use rand::rngs::OsRng;
+    /// use sha2::Sha512;
     ///
     /// # #[cfg(feature = "std")]
     /// # fn main() {
     /// let mut csprng = OsRng{};
-    /// let keypair: Keypair = Keypair::generate(&mut csprng);
+    /// let keypair: Keypair<Sha512> = Keypair::generate(&mut csprng);
     /// let message: &[u8] = b"All I want is to pet all of the dogs.";
     ///
     /// // Create a hash digest object which we'll feed the message into:
@@ -220,13 +223,13 @@ impl Keypair {
     /// # use eddsa_dalek::Digest;
     /// # use eddsa_dalek::Keypair;
     /// # use eddsa_dalek::Signature;
-    /// # use eddsa_dalek::Sha512;
     /// # use rand::rngs::OsRng;
+    /// # use sha2::Sha512;
     /// #
     /// # #[cfg(feature = "std")]
     /// # fn main() {
     /// # let mut csprng = OsRng{};
-    /// # let keypair: Keypair = Keypair::generate(&mut csprng);
+    /// # let keypair: Keypair<Sha512> = Keypair::generate(&mut csprng);
     /// # let message: &[u8] = b"All I want is to pet all of the dogs.";
     /// # let mut prehashed: Sha512 = Sha512::new();
     /// # prehashed.input(message);
@@ -242,17 +245,21 @@ impl Keypair {
     ///
     /// [rfc8032]: https://tools.ietf.org/html/rfc8032#section-5.1
     /// [terrible_idea]: https://github.com/isislovecruft/scripts/blob/master/gpgkey2bc.py
-    pub fn sign_prehashed<D>(&self, prehashed_message: D, context: Option<&[u8]>) -> Signature
+    pub fn sign_prehashed<D2>(&self, prehashed_message: D2, context: Option<&[u8]>) -> Signature
     where
         D: Digest<OutputSize = U64>,
+        D2: Digest<OutputSize = U64>,
     {
-        let expanded: ExpandedSecretKey = (&self.secret).into(); // xxx thanks i hate this
+        let expanded: ExpandedSecretKey<D> = (&self.secret).into(); // xxx thanks i hate this
 
         expanded.sign_prehashed(prehashed_message, &self.public, context)
     }
 
     /// Verify a signature on a message with this keypair's public key.
-    pub fn verify(&self, message: &[u8], signature: &Signature) -> Result<(), SignatureError> {
+    pub fn verify(&self, message: &[u8], signature: &Signature) -> Result<(), SignatureError>
+    where
+        D: Digest<OutputSize = U64>,
+    {
         self.public.verify(message, signature)
     }
 
@@ -282,13 +289,13 @@ impl Keypair {
     /// use eddsa_dalek::Digest;
     /// use eddsa_dalek::Keypair;
     /// use eddsa_dalek::Signature;
-    /// use eddsa_dalek::Sha512;
     /// use rand::rngs::OsRng;
+    /// use sha2::Sha512;
     ///
     /// # #[cfg(feature = "std")]
     /// # fn main() {
     /// let mut csprng = OsRng{};
-    /// let keypair: Keypair = Keypair::generate(&mut csprng);
+    /// let keypair: Keypair<Sha512> = Keypair::generate(&mut csprng);
     /// let message: &[u8] = b"All I want is to pet all of the dogs.";
     ///
     /// let mut prehashed: Sha512 = Sha512::new();
@@ -312,14 +319,15 @@ impl Keypair {
     /// ```
     ///
     /// [rfc8032]: https://tools.ietf.org/html/rfc8032#section-5.1
-    pub fn verify_prehashed<D>(
+    pub fn verify_prehashed<D2>(
         &self,
-        prehashed_message: D,
+        prehashed_message: D2,
         context: Option<&[u8]>,
         signature: &Signature,
     ) -> Result<(), SignatureError>
     where
         D: Digest<OutputSize = U64>,
+        D2: Digest<OutputSize = U64>,
     {
         self.public
             .verify_prehashed(prehashed_message, context, signature)
@@ -388,17 +396,16 @@ impl Keypair {
     ///
     /// Returns `Ok(())` if the signature is valid, and `Err` otherwise.
     #[allow(non_snake_case)]
-    pub fn verify_strict(
-        &self,
-        message: &[u8],
-        signature: &Signature,
-    ) -> Result<(), SignatureError> {
+    pub fn verify_strict(&self, message: &[u8], signature: &Signature) -> Result<(), SignatureError>
+    where
+        D: Digest<OutputSize = U64>,
+    {
         self.public.verify_strict(message, signature)
     }
 }
 
 #[cfg(feature = "serde")]
-impl Serialize for Keypair {
+impl<D> Serialize for Keypair<D> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -408,15 +415,16 @@ impl Serialize for Keypair {
 }
 
 #[cfg(feature = "serde")]
-impl<'d> Deserialize<'d> for Keypair {
+impl<'d, Di> Deserialize<'d> for Keypair<Di> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'d>,
     {
-        struct KeypairVisitor;
+        use std::marker::PhantomData;
+        struct KeypairVisitor<Di>(PhantomData<Di>);
 
-        impl<'d> Visitor<'d> for KeypairVisitor {
-            type Value = Keypair;
+        impl<'d, Di> Visitor<'d> for KeypairVisitor<Di> {
+            type Value = Keypair<Di>;
 
             fn expecting(&self, formatter: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
                 formatter.write_str(
@@ -426,7 +434,7 @@ impl<'d> Deserialize<'d> for Keypair {
                 )
             }
 
-            fn visit_bytes<E>(self, bytes: &[u8]) -> Result<Keypair, E>
+            fn visit_bytes<E>(self, bytes: &[u8]) -> Result<Keypair<Di>, E>
             where
                 E: SerdeError,
             {
@@ -443,7 +451,7 @@ impl<'d> Deserialize<'d> for Keypair {
                 }
             }
         }
-        deserializer.deserialize_bytes(KeypairVisitor)
+        deserializer.deserialize_bytes(KeypairVisitor(PhantomData))
     }
 }
 
@@ -452,10 +460,11 @@ mod test {
     use super::*;
 
     use clear_on_drop::clear::Clear;
+    use sha2::Sha512;
 
     #[test]
     fn keypair_clear_on_drop() {
-        let mut keypair: Keypair = Keypair::from_bytes(&[1u8; KEYPAIR_LENGTH][..]).unwrap();
+        let mut keypair: Keypair<Sha512> = Keypair::from_bytes(&[1u8; KEYPAIR_LENGTH][..]).unwrap();
 
         keypair.clear();
 

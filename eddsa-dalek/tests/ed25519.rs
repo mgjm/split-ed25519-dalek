@@ -62,9 +62,11 @@ mod vectors {
             let msg_bytes: Vec<u8> = FromHex::from_hex(&parts[2]).unwrap();
             let sig_bytes: Vec<u8> = FromHex::from_hex(&parts[3]).unwrap();
 
-            let secret: SecretKey = SecretKey::from_bytes(&sec_bytes[..SECRET_KEY_LENGTH]).unwrap();
-            let public: PublicKey = PublicKey::from_bytes(&pub_bytes[..PUBLIC_KEY_LENGTH]).unwrap();
-            let keypair: Keypair = Keypair {
+            let secret: SecretKey<Sha512> =
+                SecretKey::from_bytes(&sec_bytes[..SECRET_KEY_LENGTH]).unwrap();
+            let public: PublicKey<Sha512> =
+                PublicKey::from_bytes(&pub_bytes[..PUBLIC_KEY_LENGTH]).unwrap();
+            let keypair: Keypair<Sha512> = Keypair {
                 secret: secret,
                 public: public,
             };
@@ -96,9 +98,11 @@ mod vectors {
         let msg_bytes: Vec<u8> = FromHex::from_hex(message).unwrap();
         let sig_bytes: Vec<u8> = FromHex::from_hex(signature).unwrap();
 
-        let secret: SecretKey = SecretKey::from_bytes(&sec_bytes[..SECRET_KEY_LENGTH]).unwrap();
-        let public: PublicKey = PublicKey::from_bytes(&pub_bytes[..PUBLIC_KEY_LENGTH]).unwrap();
-        let keypair: Keypair = Keypair {
+        let secret: SecretKey<Sha512> =
+            SecretKey::from_bytes(&sec_bytes[..SECRET_KEY_LENGTH]).unwrap();
+        let public: PublicKey<Sha512> =
+            PublicKey::from_bytes(&pub_bytes[..PUBLIC_KEY_LENGTH]).unwrap();
+        let keypair: Keypair<Sha512> = Keypair {
             secret: secret,
             public: public,
         };
@@ -136,7 +140,7 @@ mod integrations {
     #[test]
     fn sign_verify() {
         // TestSignVerify
-        let keypair: Keypair;
+        let keypair: Keypair<Sha512>;
         let good_sig: Signature;
         let bad_sig: Signature;
 
@@ -165,7 +169,7 @@ mod integrations {
 
     #[test]
     fn ed25519ph_sign_verify() {
-        let keypair: Keypair;
+        let keypair: Keypair<Sha512>;
         let good_sig: Signature;
         let bad_sig: Signature;
 
@@ -225,15 +229,15 @@ mod integrations {
             b"Hey, I never cared about your bucks, so if I run up with a mask on, probably got a gas can too.",
             b"And I'm not here to fill 'er up. Nope, we came to riot, here to incite, we don't want any of your stuff.", ];
         let mut csprng = OsRng {};
-        let mut keypairs: Vec<Keypair> = Vec::new();
+        let mut keypairs: Vec<Keypair<Sha512>> = Vec::new();
         let mut signatures: Vec<Signature> = Vec::new();
 
         for i in 0..messages.len() {
-            let keypair: Keypair = Keypair::generate(&mut csprng);
+            let keypair: Keypair<Sha512> = Keypair::generate(&mut csprng);
             signatures.push(keypair.sign(&messages[i]));
             keypairs.push(keypair);
         }
-        let public_keys: Vec<PublicKey> = keypairs.iter().map(|key| key.public).collect();
+        let public_keys: Vec<PublicKey<Sha512>> = keypairs.iter().map(|key| key.public).collect();
 
         let result = verify_batch(&messages, &signatures[..], &public_keys[..]);
 
@@ -243,10 +247,10 @@ mod integrations {
     #[test]
     fn pubkey_from_secret_and_expanded_secret() {
         let mut csprng = OsRng {};
-        let secret: SecretKey = SecretKey::generate(&mut csprng);
-        let expanded_secret: ExpandedSecretKey = (&secret).into();
-        let public_from_secret: PublicKey = (&secret).into(); // XXX eww
-        let public_from_expanded_secret: PublicKey = (&expanded_secret).into(); // XXX eww
+        let secret: SecretKey<Sha512> = SecretKey::generate(&mut csprng);
+        let expanded_secret: ExpandedSecretKey<Sha512> = (&secret).into();
+        let public_from_secret: PublicKey<Sha512> = (&secret).into(); // XXX eww
+        let public_from_expanded_secret: PublicKey<Sha512> = (&expanded_secret).into(); // XXX eww
 
         assert!(public_from_secret == public_from_expanded_secret);
     }
@@ -287,9 +291,9 @@ mod serialisation {
 
     #[test]
     fn serialize_deserialize_public_key() {
-        let public_key: PublicKey = PublicKey::from_bytes(&PUBLIC_KEY_BYTES).unwrap();
+        let public_key: PublicKey<Sha512> = PublicKey::from_bytes(&PUBLIC_KEY_BYTES).unwrap();
         let encoded_public_key: Vec<u8> = serialize(&public_key, Infinite).unwrap();
-        let decoded_public_key: PublicKey = deserialize(&encoded_public_key).unwrap();
+        let decoded_public_key: PublicKey<Sha512> = deserialize(&encoded_public_key).unwrap();
 
         assert_eq!(
             &PUBLIC_KEY_BYTES[..],
@@ -300,9 +304,9 @@ mod serialisation {
 
     #[test]
     fn serialize_deserialize_secret_key() {
-        let secret_key: SecretKey = SecretKey::from_bytes(&SECRET_KEY_BYTES).unwrap();
+        let secret_key: SecretKey<Sha512> = SecretKey::from_bytes(&SECRET_KEY_BYTES).unwrap();
         let encoded_secret_key: Vec<u8> = serialize(&secret_key, Infinite).unwrap();
-        let decoded_secret_key: SecretKey = deserialize(&encoded_secret_key).unwrap();
+        let decoded_secret_key: SecretKey<Sha512> = deserialize(&encoded_secret_key).unwrap();
 
         for i in 0..32 {
             assert_eq!(SECRET_KEY_BYTES[i], decoded_secret_key.as_bytes()[i]);
@@ -311,7 +315,7 @@ mod serialisation {
 
     #[test]
     fn serialize_public_key_size() {
-        let public_key: PublicKey = PublicKey::from_bytes(&PUBLIC_KEY_BYTES).unwrap();
+        let public_key: PublicKey<Sha512> = PublicKey::from_bytes(&PUBLIC_KEY_BYTES).unwrap();
         assert_eq!(serialized_size(&public_key) as usize, 40); // These sizes are specific to bincode==1.0.1
     }
 
@@ -323,7 +327,7 @@ mod serialisation {
 
     #[test]
     fn serialize_secret_key_size() {
-        let secret_key: SecretKey = SecretKey::from_bytes(&SECRET_KEY_BYTES).unwrap();
+        let secret_key: SecretKey<Sha512> = SecretKey::from_bytes(&SECRET_KEY_BYTES).unwrap();
         assert_eq!(serialized_size(&secret_key) as usize, 40); // These sizes are specific to bincode==1.0.1
     }
 }

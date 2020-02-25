@@ -25,11 +25,12 @@
 //! # #[cfg(feature = "std")]
 //! # fn main() {
 //! use rand::rngs::OsRng;
+//! use sha2::Sha512;
 //! use eddsa_dalek::Keypair;
 //! use eddsa_dalek::Signature;
 //!
 //! let mut csprng = OsRng{};
-//! let keypair: Keypair = Keypair::generate(&mut csprng);
+//! let keypair: Keypair<Sha512> = Keypair::generate(&mut csprng);
 //! # }
 //! #
 //! # #[cfg(not(feature = "std"))]
@@ -43,10 +44,11 @@
 //! # extern crate eddsa_dalek;
 //! # fn main() {
 //! # use rand::rngs::OsRng;
+//! # use sha2::Sha512;
 //! # use eddsa_dalek::Keypair;
 //! # use eddsa_dalek::Signature;
 //! # let mut csprng = OsRng{};
-//! # let keypair: Keypair = Keypair::generate(&mut csprng);
+//! # let keypair: Keypair<Sha512> = Keypair::generate(&mut csprng);
 //! let message: &[u8] = b"This is a test of the tsunami alert system.";
 //! let signature: Signature = keypair.sign(message);
 //! # }
@@ -60,10 +62,11 @@
 //! # extern crate eddsa_dalek;
 //! # fn main() {
 //! # use rand::rngs::OsRng;
+//! # use sha2::Sha512;
 //! # use eddsa_dalek::Keypair;
 //! # use eddsa_dalek::Signature;
 //! # let mut csprng = OsRng{};
-//! # let keypair: Keypair = Keypair::generate(&mut csprng);
+//! # let keypair: Keypair<Sha512> = Keypair::generate(&mut csprng);
 //! # let message: &[u8] = b"This is a test of the tsunami alert system.";
 //! # let signature: Signature = keypair.sign(message);
 //! assert!(keypair.verify(message, &signature).is_ok());
@@ -78,15 +81,16 @@
 //! # extern crate eddsa_dalek;
 //! # fn main() {
 //! # use rand::rngs::OsRng;
+//! # use sha2::Sha512;
 //! # use eddsa_dalek::Keypair;
 //! # use eddsa_dalek::Signature;
 //! use eddsa_dalek::PublicKey;
 //! # let mut csprng = OsRng{};
-//! # let keypair: Keypair = Keypair::generate(&mut csprng);
+//! # let keypair: Keypair<Sha512> = Keypair::generate(&mut csprng);
 //! # let message: &[u8] = b"This is a test of the tsunami alert system.";
 //! # let signature: Signature = keypair.sign(message);
 //!
-//! let public_key: PublicKey = keypair.public;
+//! let public_key: PublicKey<Sha512> = keypair.public;
 //! assert!(public_key.verify(message, &signature).is_ok());
 //! # }
 //! ```
@@ -104,13 +108,14 @@
 //! # extern crate eddsa_dalek;
 //! # fn main() {
 //! # use rand::rngs::OsRng;
+//! # use sha2::Sha512;
 //! # use eddsa_dalek::{Keypair, Signature, PublicKey};
 //! use eddsa_dalek::{PUBLIC_KEY_LENGTH, SECRET_KEY_LENGTH, KEYPAIR_LENGTH, SIGNATURE_LENGTH};
 //! # let mut csprng = OsRng{};
-//! # let keypair: Keypair = Keypair::generate(&mut csprng);
+//! # let keypair: Keypair<Sha512> = Keypair::generate(&mut csprng);
 //! # let message: &[u8] = b"This is a test of the tsunami alert system.";
 //! # let signature: Signature = keypair.sign(message);
-//! # let public_key: PublicKey = keypair.public;
+//! # let public_key: PublicKey<Sha512> = keypair.public;
 //!
 //! let public_key_bytes: [u8; PUBLIC_KEY_LENGTH] = public_key.to_bytes();
 //! let secret_key_bytes: [u8; SECRET_KEY_LENGTH] = keypair.secret.to_bytes();
@@ -125,11 +130,12 @@
 //! # extern crate rand;
 //! # extern crate eddsa_dalek;
 //! # use rand::rngs::OsRng;
+//! # use sha2::Sha512;
 //! # use eddsa_dalek::{Keypair, Signature, PublicKey, SecretKey, SignatureError};
 //! # use eddsa_dalek::{PUBLIC_KEY_LENGTH, SECRET_KEY_LENGTH, KEYPAIR_LENGTH, SIGNATURE_LENGTH};
-//! # fn do_test() -> Result<(SecretKey, PublicKey, Keypair, Signature), SignatureError> {
+//! # fn do_test() -> Result<(SecretKey<Sha512>, PublicKey<Sha512>, Keypair<Sha512>, Signature), SignatureError> {
 //! # let mut csprng = OsRng{};
-//! # let keypair_orig: Keypair = Keypair::generate(&mut csprng);
+//! # let keypair_orig: Keypair<Sha512> = Keypair::generate(&mut csprng);
 //! # let message: &[u8] = b"This is a test of the tsunami alert system.";
 //! # let signature_orig: Signature = keypair_orig.sign(message);
 //! # let public_key_bytes: [u8; PUBLIC_KEY_LENGTH] = keypair_orig.public.to_bytes();
@@ -137,10 +143,10 @@
 //! # let keypair_bytes:    [u8; KEYPAIR_LENGTH]    = keypair_orig.to_bytes();
 //! # let signature_bytes:  [u8; SIGNATURE_LENGTH]  = signature_orig.to_bytes();
 //! #
-//! let public_key: PublicKey = PublicKey::from_bytes(&public_key_bytes)?;
-//! let secret_key: SecretKey = SecretKey::from_bytes(&secret_key_bytes)?;
-//! let keypair:    Keypair   = Keypair::from_bytes(&keypair_bytes)?;
-//! let signature:  Signature = Signature::from_bytes(&signature_bytes)?;
+//! let public_key: PublicKey<Sha512> = PublicKey::from_bytes(&public_key_bytes)?;
+//! let secret_key: SecretKey<Sha512> = SecretKey::from_bytes(&secret_key_bytes)?;
+//! let keypair:    Keypair<Sha512>   = Keypair::from_bytes(&keypair_bytes)?;
+//! let signature:  Signature         = Signature::from_bytes(&signature_bytes)?;
 //! #
 //! # Ok((secret_key, public_key, keypair, signature))
 //! # }
@@ -173,13 +179,14 @@
 //! # #[cfg(feature = "serde")]
 //! # fn main() {
 //! # use rand::rngs::OsRng;
+//! # use sha2::Sha512;
 //! # use eddsa_dalek::{Keypair, Signature, PublicKey};
 //! use bincode::{serialize, Infinite};
 //! # let mut csprng = OsRng{};
-//! # let keypair: Keypair = Keypair::generate(&mut csprng);
+//! # let keypair: Keypair<Sha512> = Keypair::generate(&mut csprng);
 //! # let message: &[u8] = b"This is a test of the tsunami alert system.";
 //! # let signature: Signature = keypair.sign(message);
-//! # let public_key: PublicKey = keypair.public;
+//! # let public_key: PublicKey<Sha512> = keypair.public;
 //! # let verified: bool = public_key.verify(message, &signature).is_ok();
 //!
 //! let encoded_public_key: Vec<u8> = serialize(&public_key, Infinite).unwrap();
@@ -203,19 +210,20 @@
 //! # #[cfg(feature = "serde")]
 //! # fn main() {
 //! # use rand::rngs::OsRng;
+//! # use sha2::Sha512;
 //! # use eddsa_dalek::{Keypair, Signature, PublicKey};
 //! # use bincode::{serialize, Infinite};
 //! use bincode::{deserialize};
 //!
 //! # let mut csprng = OsRng{};
-//! # let keypair: Keypair = Keypair::generate(&mut csprng);
+//! # let keypair: Keypair<Sha512> = Keypair::generate(&mut csprng);
 //! let message: &[u8] = b"This is a test of the tsunami alert system.";
 //! # let signature: Signature = keypair.sign(message);
-//! # let public_key: PublicKey = keypair.public;
+//! # let public_key: PublicKey<Sha512> = keypair.public;
 //! # let verified: bool = public_key.verify(message, &signature).is_ok();
 //! # let encoded_public_key: Vec<u8> = serialize(&public_key, Infinite).unwrap();
 //! # let encoded_signature: Vec<u8> = serialize(&signature, Infinite).unwrap();
-//! let decoded_public_key: PublicKey = deserialize(&encoded_public_key).unwrap();
+//! let decoded_public_key: PublicKey<Sha512> = deserialize(&encoded_public_key).unwrap();
 //! let decoded_signature: Signature = deserialize(&encoded_signature).unwrap();
 //!
 //! # assert_eq!(public_key, decoded_public_key);
@@ -250,7 +258,6 @@ extern crate merlin;
 extern crate rand;
 #[cfg(feature = "serde")]
 extern crate serde;
-extern crate sha2;
 
 #[cfg(all(
 	any(feature = "batch", feature = "batch_deterministic"),
@@ -264,10 +271,23 @@ mod public;
 mod secret;
 mod signature;
 
-// Export everything public in eddsa.
+#[doc(hidden)]
+/// All non generic public types and functions.
+pub mod non_generic {
+	pub use crate::constants::*;
+	pub use crate::errors::*;
+	pub use crate::signature::*;
+	pub use curve25519_dalek::digest::Digest;
+}
+
 #[cfg(all(
 	any(feature = "batch", feature = "batch_deterministic"),
 	any(feature = "std", feature = "alloc")
 ))]
 pub use crate::batch::*;
 pub use crate::eddsa::*;
+pub use crate::public::*;
+pub use crate::secret::*;
+
+#[doc(inline)]
+pub use crate::non_generic::*;

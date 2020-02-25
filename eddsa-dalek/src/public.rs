@@ -10,6 +10,7 @@
 //! ed25519 public keys.
 
 use core::fmt::Debug;
+use std::marker::PhantomData;
 
 use curve25519_dalek::constants;
 use curve25519_dalek::digest::generic_array::typenum::U64;
@@ -17,8 +18,6 @@ use curve25519_dalek::digest::Digest;
 use curve25519_dalek::edwards::CompressedEdwardsY;
 use curve25519_dalek::edwards::EdwardsPoint;
 use curve25519_dalek::scalar::Scalar;
-
-pub use sha2::Sha512;
 
 #[cfg(feature = "serde")]
 use serde::de::Error as SerdeError;
@@ -35,25 +34,50 @@ use crate::secret::*;
 use crate::signature::*;
 
 /// An ed25519 public key.
-#[derive(Copy, Clone, Default, Eq, PartialEq)]
-pub struct PublicKey(pub(crate) CompressedEdwardsY, pub(crate) EdwardsPoint);
+pub struct PublicKey<D>(
+    pub(crate) CompressedEdwardsY,
+    pub(crate) EdwardsPoint,
+    PhantomData<D>,
+);
 
-impl Debug for PublicKey {
+impl<D> Copy for PublicKey<D> {}
+impl<D> Clone for PublicKey<D> {
+    fn clone(&self) -> PublicKey<D> {
+        *self
+    }
+}
+
+impl<D> Default for PublicKey<D> {
+    fn default() -> PublicKey<D> {
+        PublicKey(Default::default(), Default::default(), PhantomData)
+    }
+}
+impl<D> Eq for PublicKey<D> {}
+impl<D> PartialEq for PublicKey<D> {
+    fn eq(&self, other: &PublicKey<D>) -> bool {
+        self.0 == other.0 && self.1 == other.1
+    }
+}
+
+impl<D> Debug for PublicKey<D> {
     fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
         write!(f, "PublicKey({:?}), {:?})", self.0, self.1)
     }
 }
 
-impl AsRef<[u8]> for PublicKey {
+impl<D> AsRef<[u8]> for PublicKey<D> {
     fn as_ref(&self) -> &[u8] {
         self.as_bytes()
     }
 }
 
-impl<'a> From<&'a SecretKey> for PublicKey {
+impl<'a, D> From<&'a SecretKey<D>> for PublicKey<D>
+where
+    D: Digest<OutputSize = U64>,
+{
     /// Derive this public key from its corresponding `SecretKey`.
-    fn from(secret_key: &SecretKey) -> PublicKey {
-        let mut h: Sha512 = Sha512::new();
+    fn from(secret_key: &SecretKey<D>) -> PublicKey<D> {
+        let mut h: D = D::new();
         let mut hash: [u8; 64] = [0u8; 64];
         let mut digest: [u8; 32] = [0u8; 32];
 
@@ -66,16 +90,16 @@ impl<'a> From<&'a SecretKey> for PublicKey {
     }
 }
 
-impl<'a> From<&'a ExpandedSecretKey> for PublicKey {
+impl<'a, D> From<&'a ExpandedSecretKey<D>> for PublicKey<D> {
     /// Derive this public key from its corresponding `ExpandedSecretKey`.
-    fn from(expanded_secret_key: &ExpandedSecretKey) -> PublicKey {
+    fn from(expanded_secret_key: &ExpandedSecretKey<D>) -> PublicKey<D> {
         let mut bits: [u8; 32] = expanded_secret_key.key.to_bytes();
 
         PublicKey::mangle_scalar_bits_and_multiply_by_basepoint_to_produce_public_key(&mut bits)
     }
 }
 
-impl PublicKey {
+impl<D> PublicKey<D> {
     /// Convert this public key to a byte array.
     #[inline]
     pub fn to_bytes(&self) -> [u8; PUBLIC_KEY_LENGTH] {
@@ -104,8 +128,9 @@ impl PublicKey {
     /// use eddsa_dalek::PublicKey;
     /// use eddsa_dalek::PUBLIC_KEY_LENGTH;
     /// use eddsa_dalek::SignatureError;
+    /// use sha2::Sha512;
     ///
-    /// # fn doctest() -> Result<PublicKey, SignatureError> {
+    /// # fn doctest() -> Result<PublicKey<Sha512>, SignatureError> {
     /// let public_key_bytes: [u8; PUBLIC_KEY_LENGTH] = [
     ///    215,  90, 152,   1, 130, 177,  10, 183, 213,  75, 254, 211, 201, 100,   7,  58,
     ///     14, 225, 114, 243, 218, 166,  35,  37, 175,   2,  26, 104, 247,   7,   81, 26];
@@ -125,7 +150,7 @@ impl PublicKey {
     /// A `Result` whose okay value is an EdDSA `PublicKey` or whose error value
     /// is an `SignatureError` describing the error that occurred.
     #[inline]
-    pub fn from_bytes(bytes: &[u8]) -> Result<PublicKey, SignatureError> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<PublicKey<D>, SignatureError> {
         if bytes.len() != PUBLIC_KEY_LENGTH {
             return Err(SignatureError(InternalError::BytesLengthError {
                 name: "PublicKey",
@@ -140,7 +165,7 @@ impl PublicKey {
             .decompress()
             .ok_or(SignatureError(InternalError::PointDecompressionError))?;
 
-        Ok(PublicKey(compressed, point))
+        Ok(PublicKey(compressed, point, PhantomData))
     }
 
     /// Internal utility function for mangling the bits of a (formerly
@@ -148,7 +173,7 @@ impl PublicKey {
     /// public key.
     fn mangle_scalar_bits_and_multiply_by_basepoint_to_produce_public_key(
         bits: &mut [u8; 32],
-    ) -> PublicKey {
+    ) -> PublicKey<D> {
         bits[0] &= 248;
         bits[31] &= 127;
         bits[31] |= 64;
@@ -156,7 +181,7 @@ impl PublicKey {
         let point = &Scalar::from_bits(*bits) * &constants::ED25519_BASEPOINT_TABLE;
         let compressed = point.compress();
 
-        PublicKey(compressed, point)
+        PublicKey(compressed, point, PhantomData)
     }
 
     /// Verify a signature on a message with this keypair's public key.
@@ -165,8 +190,11 @@ impl PublicKey {
     ///
     /// Returns `Ok(())` if the signature is valid, and `Err` otherwise.
     #[allow(non_snake_case)]
-    pub fn verify(&self, message: &[u8], signature: &Signature) -> Result<(), SignatureError> {
-        let mut h: Sha512 = Sha512::new();
+    pub fn verify(&self, message: &[u8], signature: &Signature) -> Result<(), SignatureError>
+    where
+        D: Digest<OutputSize = U64>,
+    {
+        let mut h: D = D::new();
         let R: EdwardsPoint;
         let k: Scalar;
         let minus_A: EdwardsPoint = -self.1;
@@ -204,16 +232,17 @@ impl PublicKey {
     ///
     /// [rfc8032]: https://tools.ietf.org/html/rfc8032#section-5.1
     #[allow(non_snake_case)]
-    pub fn verify_prehashed<D>(
+    pub fn verify_prehashed<D2>(
         &self,
-        prehashed_message: D,
+        prehashed_message: D2,
         context: Option<&[u8]>,
         signature: &Signature,
     ) -> Result<(), SignatureError>
     where
         D: Digest<OutputSize = U64>,
+        D2: Digest<OutputSize = U64>,
     {
-        let mut h: Sha512 = Sha512::default();
+        let mut h: D = D::new();
         let R: EdwardsPoint;
         let k: Scalar;
 
@@ -306,12 +335,11 @@ impl PublicKey {
     ///
     /// Returns `Ok(())` if the signature is valid, and `Err` otherwise.
     #[allow(non_snake_case)]
-    pub fn verify_strict(
-        &self,
-        message: &[u8],
-        signature: &Signature,
-    ) -> Result<(), SignatureError> {
-        let mut h: Sha512 = Sha512::new();
+    pub fn verify_strict(&self, message: &[u8], signature: &Signature) -> Result<(), SignatureError>
+    where
+        D: Digest<OutputSize = U64>,
+    {
+        let mut h: D = D::new();
         let R: EdwardsPoint;
         let k: Scalar;
         let minus_A: EdwardsPoint = -self.1;
@@ -343,7 +371,7 @@ impl PublicKey {
 }
 
 #[cfg(feature = "serde")]
-impl Serialize for PublicKey {
+impl<D> Serialize for PublicKey<D> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -353,15 +381,15 @@ impl Serialize for PublicKey {
 }
 
 #[cfg(feature = "serde")]
-impl<'d> Deserialize<'d> for PublicKey {
+impl<'d, Di> Deserialize<'d> for PublicKey<Di> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'d>,
     {
-        struct PublicKeyVisitor;
+        struct PublicKeyVisitor<Di>(PhantomData<Di>);
 
-        impl<'d> Visitor<'d> for PublicKeyVisitor {
-            type Value = PublicKey;
+        impl<'d, Di> Visitor<'d> for PublicKeyVisitor<Di> {
+            type Value = PublicKey<Di>;
 
             fn expecting(&self, formatter: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
                 formatter.write_str(
@@ -369,13 +397,13 @@ impl<'d> Deserialize<'d> for PublicKey {
                 )
             }
 
-            fn visit_bytes<E>(self, bytes: &[u8]) -> Result<PublicKey, E>
+            fn visit_bytes<E>(self, bytes: &[u8]) -> Result<PublicKey<Di>, E>
             where
                 E: SerdeError,
             {
                 PublicKey::from_bytes(bytes).or(Err(SerdeError::invalid_length(bytes.len(), &self)))
             }
         }
-        deserializer.deserialize_bytes(PublicKeyVisitor)
+        deserializer.deserialize_bytes(PublicKeyVisitor(PhantomData))
     }
 }

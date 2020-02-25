@@ -22,7 +22,8 @@ use curve25519_dalek::scalar::Scalar;
 use curve25519_dalek::traits::IsIdentity;
 use curve25519_dalek::traits::VartimeMultiscalarMul;
 
-pub use curve25519_dalek::digest::Digest;
+use curve25519_dalek::digest::generic_array::typenum::U64;
+use curve25519_dalek::digest::Digest;
 
 use merlin::Transcript;
 
@@ -31,8 +32,6 @@ use rand::thread_rng;
 use rand::Rng;
 #[cfg(all(not(feature = "batch"), feature = "batch_deterministic"))]
 use rand_core;
-
-use sha2::Sha512;
 
 use crate::errors::InternalError;
 use crate::errors::SignatureError;
@@ -130,14 +129,15 @@ fn zero_rng() -> ZeroRng {
 /// use eddsa_dalek::PublicKey;
 /// use eddsa_dalek::Signature;
 /// use rand::rngs::OsRng;
+/// use sha2::Sha512;
 ///
 /// # fn main() {
 /// let mut csprng = OsRng{};
-/// let keypairs: Vec<Keypair> = (0..64).map(|_| Keypair::generate(&mut csprng)).collect();
+/// let keypairs: Vec<Keypair<Sha512>> = (0..64).map(|_| Keypair::generate(&mut csprng)).collect();
 /// let msg: &[u8] = b"They're good dogs Brant";
 /// let messages: Vec<&[u8]> = (0..64).map(|_| msg).collect();
 /// let signatures:  Vec<Signature> = keypairs.iter().map(|key| key.sign(&msg)).collect();
-/// let public_keys: Vec<PublicKey> = keypairs.iter().map(|key| key.public).collect();
+/// let public_keys: Vec<PublicKey<Sha512>> = keypairs.iter().map(|key| key.public).collect();
 ///
 /// let result = verify_batch(&messages[..], &signatures[..], &public_keys[..]);
 /// assert!(result.is_ok());
@@ -148,11 +148,14 @@ fn zero_rng() -> ZeroRng {
     any(feature = "alloc", feature = "std")
 ))]
 #[allow(non_snake_case)]
-pub fn verify_batch(
+pub fn verify_batch<D>(
     messages: &[&[u8]],
     signatures: &[Signature],
-    public_keys: &[PublicKey],
-) -> Result<(), SignatureError> {
+    public_keys: &[PublicKey<D>],
+) -> Result<(), SignatureError>
+where
+    D: Digest<OutputSize = U64>,
+{
     // Return an Error if any of the vectors were not the same size as the others.
     if signatures.len() != messages.len()
         || signatures.len() != public_keys.len()
@@ -171,7 +174,7 @@ pub fn verify_batch(
     // Compute H(R || A || M) for each (signature, public_key, message) triplet
     let hrams: Vec<Scalar> = (0..signatures.len())
         .map(|i| {
-            let mut h: Sha512 = Sha512::default();
+            let mut h: D = D::new();
             h.input(signatures[i].R.as_bytes());
             h.input(public_keys[i].as_bytes());
             h.input(&messages[i]);

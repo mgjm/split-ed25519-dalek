@@ -28,13 +28,13 @@ merlin = { version = "1", default-features = false, optional = true, git = "http
 rand = { version = "0.7", default-features = false, optional = true }
 rand_core = { version = "0.5", default-features = false, optional = true }
 serde = { version = "1.0", optional = true }
-sha2 = { version = "0.8", default-features = false }
 
 [dev-dependencies]
 hex = "^0.4"
 bincode = "^0.9"
 criterion = "0.3"
 rand = "0.7"
+sha2 = "0.8"
 
 [[bench]]
 name = "ed25519_benchmarks"
@@ -45,13 +45,12 @@ harness = false
 
 [features]
 default = ["std", "u64_backend"]
-std = ["curve25519-dalek/std", "sha2/std", "rand/std"]
+std = ["curve25519-dalek/std", "rand/std"]
 alloc = ["curve25519-dalek/alloc", "rand/alloc"]
 nightly = ["curve25519-dalek/nightly", "clear_on_drop/nightly", "rand/nightly"]
 batch = ["merlin", "rand"]
 # This feature enables deterministic batch verification.
 batch_deterministic = ["merlin", "rand", "rand_core"]
-asm = ["sha2/asm"]
 # This features turns off stricter checking for scalar malleability in signatures
 legacy_compatibility = []
 u64_backend = ["curve25519-dalek/u64_backend"]

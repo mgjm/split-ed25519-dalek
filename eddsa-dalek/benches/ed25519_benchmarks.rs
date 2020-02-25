@@ -23,10 +23,11 @@ mod ed25519_benches {
     use eddsa_dalek::Signature;
     use rand::prelude::ThreadRng;
     use rand::thread_rng;
+    use sha2::Sha512;
 
     fn sign(c: &mut Criterion) {
         let mut csprng: ThreadRng = thread_rng();
-        let keypair: Keypair = Keypair::generate(&mut csprng);
+        let keypair: Keypair<Sha512> = Keypair::generate(&mut csprng);
         let msg: &[u8] = b"";
 
         c.bench_function("Ed25519 signing", move |b| b.iter(|| keypair.sign(msg)));
@@ -34,8 +35,8 @@ mod ed25519_benches {
 
     fn sign_expanded_key(c: &mut Criterion) {
         let mut csprng: ThreadRng = thread_rng();
-        let keypair: Keypair = Keypair::generate(&mut csprng);
-        let expanded: ExpandedSecretKey = (&keypair.secret).into();
+        let keypair: Keypair<Sha512> = Keypair::generate(&mut csprng);
+        let expanded: ExpandedSecretKey<Sha512> = (&keypair.secret).into();
         let msg: &[u8] = b"";
         c.bench_function("Ed25519 signing with an expanded secret key", move |b| {
             b.iter(|| expanded.sign(msg, &keypair.public))
@@ -44,7 +45,7 @@ mod ed25519_benches {
 
     fn verify(c: &mut Criterion) {
         let mut csprng: ThreadRng = thread_rng();
-        let keypair: Keypair = Keypair::generate(&mut csprng);
+        let keypair: Keypair<Sha512> = Keypair::generate(&mut csprng);
         let msg: &[u8] = b"";
         let sig: Signature = keypair.sign(msg);
         c.bench_function("Ed25519 signature verification", move |b| {
@@ -54,7 +55,7 @@ mod ed25519_benches {
 
     fn verify_strict(c: &mut Criterion) {
         let mut csprng: ThreadRng = thread_rng();
-        let keypair: Keypair = Keypair::generate(&mut csprng);
+        let keypair: Keypair<Sha512> = Keypair::generate(&mut csprng);
         let msg: &[u8] = b"";
         let sig: Signature = keypair.sign(msg);
 
@@ -70,13 +71,14 @@ mod ed25519_benches {
             "Ed25519 batch signature verification",
             |b, &&size| {
                 let mut csprng: ThreadRng = thread_rng();
-                let keypairs: Vec<Keypair> =
+                let keypairs: Vec<Keypair<Sha512>> =
                     (0..size).map(|_| Keypair::generate(&mut csprng)).collect();
                 let msg: &[u8] = b"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
                 let messages: Vec<&[u8]> = (0..size).map(|_| msg).collect();
                 let signatures: Vec<Signature> =
                     keypairs.iter().map(|key| key.sign(&msg)).collect();
-                let public_keys: Vec<PublicKey> = keypairs.iter().map(|key| key.public).collect();
+                let public_keys: Vec<PublicKey<Sha512>> =
+                    keypairs.iter().map(|key| key.public).collect();
 
                 b.iter(|| verify_batch(&messages[..], &signatures[..], &public_keys[..]));
             },
@@ -88,7 +90,7 @@ mod ed25519_benches {
         let mut csprng: ThreadRng = thread_rng();
 
         c.bench_function("Ed25519 keypair generation", move |b| {
-            b.iter(|| Keypair::generate(&mut csprng))
+            b.iter(|| Keypair::<Sha512>::generate(&mut csprng))
         });
     }
 
